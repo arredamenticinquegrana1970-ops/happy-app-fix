@@ -1,16 +1,65 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useEffect, useState, useRef } from 'react';
+import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
+import { VoiceAssistant } from '@/components/VoiceAssistant';
+import { DashboardTabs } from '@/components/DashboardTabs';
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const {
+    isSpeaking,
+    isListening,
+    messages,
+    currentTranscript,
+    greet,
+    narrateSection,
+    startListening,
+    stopListening,
+    stopSpeaking,
+    sendTextMessage,
+  } = useVoiceAssistant();
+
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const hasGreeted = useRef(false);
+
+  useEffect(() => {
+    if (!hasGreeted.current) {
+      hasGreeted.current = true;
+      // Small delay for page to load
+      setTimeout(() => greet(), 1000);
+    }
+  }, [greet]);
+
+  const handleTabClick = (key: string) => {
+    setActiveTab(key);
+    narrateSection(key);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="flex flex-col h-screen w-full overflow-hidden">
+      {/* Tab bar */}
+      <DashboardTabs onTabClick={handleTabClick} activeTab={activeTab} />
+
+      {/* Dashboard iframe */}
+      <div className="flex-1 relative">
+        <iframe
+          src="/dashboard.html"
+          className="w-full h-full border-none"
+          title="Dashboard CEO"
+        />
+      </div>
+
+      {/* Voice Assistant overlay */}
+      <VoiceAssistant
+        isSpeaking={isSpeaking}
+        isListening={isListening}
+        messages={messages}
+        currentTranscript={currentTranscript}
+        onStartListening={startListening}
+        onStopListening={stopListening}
+        onStopSpeaking={stopSpeaking}
+        onSendMessage={sendTextMessage}
+      />
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
