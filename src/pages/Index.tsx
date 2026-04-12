@@ -7,6 +7,7 @@ const Index = () => {
   const {
     isSpeaking,
     isListening,
+    isLoading,
     messages,
     currentTranscript,
     greet,
@@ -51,6 +52,7 @@ const Index = () => {
       <VoiceAssistant
         isSpeaking={isSpeaking}
         isListening={isListening}
+        isLoading={isLoading}
         messages={messages}
         currentTranscript={currentTranscript}
         onStartListening={startListening}
