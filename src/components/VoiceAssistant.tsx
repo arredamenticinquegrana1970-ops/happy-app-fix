@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2, VolumeX, Send, MessageCircle, X, ChevronDown } fr
 interface VoiceAssistantProps {
   isSpeaking: boolean;
   isListening: boolean;
+  isLoading?: boolean;
   messages: Array<{ role: 'ai' | 'user'; text: string }>;
   currentTranscript: string;
   onStartListening: () => void;
@@ -15,6 +16,7 @@ interface VoiceAssistantProps {
 export function VoiceAssistant({
   isSpeaking,
   isListening,
+  isLoading,
   messages,
   currentTranscript,
   onStartListening,
@@ -107,6 +109,14 @@ export function VoiceAssistant({
             <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed text-white/70 italic"
               style={{ background: '#1e3a8a80' }}>
               {currentTranscript}...
+            </div>
+          </div>
+        )}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm border flex items-center gap-2"
+              style={{ background: '#fff', borderColor: 'rgba(0,0,0,0.08)' }}>
+              <span className="animate-pulse">🤔</span> Sto pensando...
             </div>
           </div>
         )}
