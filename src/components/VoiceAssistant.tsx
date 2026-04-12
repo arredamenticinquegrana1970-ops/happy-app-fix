@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2, VolumeX, Send, MessageCircle, X, ChevronDown } fr
 interface VoiceAssistantProps {
   isSpeaking: boolean;
   isListening: boolean;
+  isLoading?: boolean;
   messages: Array<{ role: 'ai' | 'user'; text: string }>;
   currentTranscript: string;
   onStartListening: () => void;
