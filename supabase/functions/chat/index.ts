@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.103.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,19 +10,9 @@ const SYSTEM_PROMPT = `Sei l'assistente AI personale del CEO di un gruppo di sho
 
 Ti rivolgi al Direttore con rispetto e professionalità. Rispondi sempre in italiano.
 
-Hai accesso ai dati della dashboard CEO che include:
-- KPI del giorno (fatturato, margine ~38%, conversione ~22%, preventivi attivi ~47)
-- Performance dei 9 negozi (Ottaviano in testa, poi Sant'Arpino, Giugliano, etc.)
-- Classifica venditori e dati ingressi
-- Presenze HR e marginalità (38.2%)
-- Commissioni critiche (giacenze, ritardi consegna)
-- Customer satisfaction (4.3/5 stelle)
-- Lead e agenzie (127 lead attivi, conversione 34%)
-- Mercato e social media
-- Strategia e competitor
+Hai accesso ai dati della dashboard CEO. Quando ti vengono forniti dati aggiuntivi dal sistema (file caricati, fonti web), usali per le tue analisi.
 
 Quando l'utente chiede di una sezione specifica, fornisci dati dettagliati e analisi.
-Quando chiede una "sintesi strategica", fai un riepilogo completo di tutte le aree.
 Sii conciso ma informativo. Usa numeri e dati concreti.
 Rispondi in modo naturale, come se stessi parlando al Direttore.`;
 
@@ -31,9 +22,49 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, mode, dashboardData } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Fetch data sources from DB
+    let dataContext = "";
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      const { data: sources } = await supabase
+        .from("data_sources")
+        .select("*")
+        .eq("is_active", true);
+
+      if (sources && sources.length > 0) {
+        dataContext += "\n\nFonti dati configurate dall'utente:\n";
+        for (const s of sources) {
+          dataContext += `- ${s.name}: ${s.url} (${s.description || 'nessuna descrizione'})\n`;
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching data sources:", e);
+    }
+
+    // Build system message based on mode
+    let systemContent = SYSTEM_PROMPT + dataContext;
+    
+    if (mode === "punto_situazione") {
+      systemContent += `\n\nMODALITÀ: PUNTO DELLA SITUAZIONE
+Devi leggere TUTTI i dati della dashboard e fare un report completo e dettagliato.
+Inizia con: "Salve Direttore, leggo le notizie di oggi."
+Poi analizza ogni area: KPI, negozi, venditori, HR, commissioni critiche, lead, mercato, strategia.
+Sii esaustivo e usa tutti i dati disponibili.`;
+      if (dashboardData) {
+        systemContent += `\n\nDATI DASHBOARD ATTUALI:\n${dashboardData}`;
+      }
+    } else if (mode === "conversazione") {
+      systemContent += `\n\nMODALITÀ: CONVERSAZIONE LIBERA
+Inizia con: "Salve Direttore, cosa posso fare per lei?"
+Poi rispondi alle domande dell'utente in modo naturale.`;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -44,7 +75,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemContent },
           ...messages,
         ],
         stream: false,
