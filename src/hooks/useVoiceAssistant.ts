@@ -1,20 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const SECTION_PROMPTS: Record<string, string> = {
-  'kpi': 'Dimmi i KPI del giorno in dettaglio: fatturato, margine, conversione, preventivi attivi.',
-  'negozi': 'Analizza la performance dei 9 showroom del gruppo. Chi è in testa? Chi deve migliorare?',
-  'venditori': 'Dimmi la classifica venditori, gli ingressi nei negozi e la conversione dal traffico alle vendite.',
-  'presenze': 'Parlami delle presenze HR, il punteggio disciplinare e la marginalità del gruppo.',
-  'commissioni': 'Quali sono le commissioni critiche? Giacenze con merce arrivata e saldo mancante, ritardi di consegna.',
-  'riepilogo': 'Fammi un riepilogo complessivo con customer satisfaction, recensioni, consegne e social media.',
-  'lead': 'Analizza il funnel lead: quanti lead attivi, conversione da lead a preventivo, agenzie immobiliari, confronto bimestre.',
-  'mercato': 'Come va il mercato dell\'arredamento in Campania? E i social media aziendali?',
-  'strategia': 'Analisi strategica: i 5 brand del gruppo, posizionamento competitivo, competitor, opportunità territoriali, priorità top 5.',
-};
-
-const WELCOME_MESSAGE = "Salve Direttore, cosa facciamo oggi? Vuole che faccia io una Sintesi Strategica, o vuole chiedermi qualcosa nello specifico?";
-
 export function useVoiceAssistant() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -23,7 +9,6 @@ export function useVoiceAssistant() {
   const [currentTranscript, setCurrentTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef(window.speechSynthesis);
-  const hasGreeted = useRef(false);
   const conversationRef = useRef<Array<{ role: string; content: string }>>([]);
 
   const speak = useCallback((text: string, onEnd?: () => void) => {
@@ -46,13 +31,13 @@ export function useVoiceAssistant() {
     setIsSpeaking(false);
   }, []);
 
-  const callAI = useCallback(async (userMessage: string): Promise<string> => {
+  const callAI = useCallback(async (userMessage: string, mode?: string, dashboardData?: string): Promise<string> => {
     conversationRef.current.push({ role: 'user', content: userMessage });
     
     try {
       setIsLoading(true);
       const { data, error } = await supabase.functions.invoke('chat', {
-        body: { messages: conversationRef.current },
+        body: { messages: conversationRef.current, mode, dashboardData },
       });
 
       if (error) throw error;
@@ -67,19 +52,36 @@ export function useVoiceAssistant() {
     }
   }, []);
 
-  const greet = useCallback(() => {
-    if (hasGreeted.current) return;
-    hasGreeted.current = true;
-    setMessages([{ role: 'ai', text: WELCOME_MESSAGE }]);
-    setTimeout(() => speak(WELCOME_MESSAGE), 500);
-  }, [speak]);
-
-  const narrateSection = useCallback(async (sectionKey: string) => {
-    const prompt = SECTION_PROMPTS[sectionKey];
-    if (!prompt) return;
+  // Command 1: Punto della situazione - reads all dashboard data
+  const puntoSituazione = useCallback(async () => {
     stopSpeaking();
-    setMessages(prev => [...prev, { role: 'user', text: prompt }]);
-    const reply = await callAI(prompt);
+    conversationRef.current = []; // Reset conversation
+    const prompt = "Fammi il punto della situazione completo leggendo tutti i dati della dashboard.";
+    setMessages([{ role: 'user', text: '📊 Punto della Situazione' }]);
+    
+    // Try to extract dashboard data from iframe
+    let dashboardData = "";
+    try {
+      const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+      if (iframe?.contentDocument) {
+        dashboardData = iframe.contentDocument.body.innerText || "";
+      }
+    } catch (e) {
+      console.log("Cannot access iframe data (cross-origin)");
+    }
+    
+    const reply = await callAI(prompt, 'punto_situazione', dashboardData);
+    setMessages(prev => [...prev, { role: 'ai', text: reply }]);
+    speak(reply);
+  }, [callAI, speak, stopSpeaking]);
+
+  // Command 2: Free conversation
+  const conversazioneLibera = useCallback(async () => {
+    stopSpeaking();
+    conversationRef.current = []; // Reset conversation
+    const prompt = "Inizia una conversazione con me.";
+    setMessages([{ role: 'user', text: '💬 Conversazione Libera' }]);
+    const reply = await callAI(prompt, 'conversazione');
     setMessages(prev => [...prev, { role: 'ai', text: reply }]);
     speak(reply);
   }, [callAI, speak, stopSpeaking]);
@@ -134,7 +136,8 @@ export function useVoiceAssistant() {
 
   return {
     isSpeaking, isListening, isLoading, messages, currentTranscript,
-    greet, narrateSection, startListening, stopListening, stopSpeaking,
+    puntoSituazione, conversazioneLibera,
+    startListening, stopListening, stopSpeaking,
     speak, sendTextMessage,
   };
 }

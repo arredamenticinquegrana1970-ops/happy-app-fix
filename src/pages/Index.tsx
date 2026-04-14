@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState } from 'react';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 import { VoiceAssistant } from '@/components/VoiceAssistant';
-import { DashboardTabs } from '@/components/DashboardTabs';
+import { DataSourcesManager } from '@/components/DataSourcesManager';
+import { Settings } from 'lucide-react';
 
 const Index = () => {
   const {
@@ -10,34 +11,56 @@ const Index = () => {
     isLoading,
     messages,
     currentTranscript,
-    greet,
-    narrateSection,
+    puntoSituazione,
+    conversazioneLibera,
     startListening,
     stopListening,
     stopSpeaking,
     sendTextMessage,
   } = useVoiceAssistant();
 
-  const [activeTab, setActiveTab] = useState<string | null>(null);
-  const hasGreeted = useRef(false);
+  const [showDataSources, setShowDataSources] = useState(false);
+  const [started, setStarted] = useState(false);
 
-  useEffect(() => {
-    if (!hasGreeted.current) {
-      hasGreeted.current = true;
-      // Small delay for page to load
-      setTimeout(() => greet(), 1000);
-    }
-  }, [greet]);
-
-  const handleTabClick = (key: string) => {
-    setActiveTab(key);
-    narrateSection(key);
+  const handleCommand = (cmd: 'punto' | 'parla') => {
+    setStarted(true);
+    if (cmd === 'punto') puntoSituazione();
+    else conversazioneLibera();
   };
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden">
-      {/* Tab bar */}
-      <DashboardTabs onTabClick={handleTabClick} activeTab={activeTab} />
+      {/* Top bar with commands */}
+      <div className="flex items-center justify-between px-4 py-2.5" style={{ background: '#1e3a8a' }}>
+        <div className="flex items-center gap-2">
+          <span className="text-white font-bold text-sm" style={{ fontFamily: "'Syne', sans-serif" }}>
+            🏢 ArredoCloud Dashboard CEO
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleCommand('punto')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all hover:scale-105"
+            style={{ background: '#fff', color: '#1e3a8a' }}
+          >
+            📊 Punto della Situazione
+          </button>
+          <button
+            onClick={() => handleCommand('parla')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all hover:scale-105"
+            style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}
+          >
+            💬 Parla con l'AI
+          </button>
+          <button
+            onClick={() => setShowDataSources(true)}
+            className="p-2 rounded-full hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+            title="Gestione Fonti Dati"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
       {/* Dashboard iframe */}
       <div className="flex-1 relative">
@@ -48,18 +71,23 @@ const Index = () => {
         />
       </div>
 
-      {/* Voice Assistant overlay */}
-      <VoiceAssistant
-        isSpeaking={isSpeaking}
-        isListening={isListening}
-        isLoading={isLoading}
-        messages={messages}
-        currentTranscript={currentTranscript}
-        onStartListening={startListening}
-        onStopListening={stopListening}
-        onStopSpeaking={stopSpeaking}
-        onSendMessage={sendTextMessage}
-      />
+      {/* Voice Assistant overlay - only shows after a command is pressed */}
+      {started && (
+        <VoiceAssistant
+          isSpeaking={isSpeaking}
+          isListening={isListening}
+          isLoading={isLoading}
+          messages={messages}
+          currentTranscript={currentTranscript}
+          onStartListening={startListening}
+          onStopListening={stopListening}
+          onStopSpeaking={stopSpeaking}
+          onSendMessage={sendTextMessage}
+        />
+      )}
+
+      {/* Data Sources Manager */}
+      <DataSourcesManager isOpen={showDataSources} onClose={() => setShowDataSources(false)} />
     </div>
   );
 };
